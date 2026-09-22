@@ -1,0 +1,44 @@
+# Gradle
+/.gradle/
+/build/
+/app/build/
+*.apk
+.gradle.stale.*
+
+# Local configuration
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Kotlin metadata
+.*.kotlin/
+
+# Captures
+/captures
+
+# C++ build
+.cxx/
+
+# Keystore / Keystore properties (CRITICAL - never commit)
+keystore.properties
+*.jks
+*.keystore
+
+# OS
+.DS_Store
+
+# Android Studio
+/.gradle/
+/build/
+/local.properties
+/.idea/
+/*.iml
+/.cxx/
+/.gradle/
+
+# Keystore (extra safety)
+keystore.properties
+*.jks
+*.keystore
