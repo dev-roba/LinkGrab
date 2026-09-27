@@ -17,6 +17,7 @@ import dev.personal.linkgrab.R
 import dev.personal.linkgrab.data.FormatSelector
 import dev.personal.linkgrab.data.MediaStoreSaver
 import dev.personal.linkgrab.data.MediaInfoCache
+import dev.personal.linkgrab.data.InstagramCookies
 import dev.personal.linkgrab.data.history.HistoryEntity
 import dev.personal.linkgrab.model.AudioFormat
 import dev.personal.linkgrab.model.DownloadItem
@@ -73,7 +74,9 @@ class DownloadService : Service() {
             if (freeBytes < 100L * 1024 * 1024) error("Not enough storage space. Free at least 100 MB and retry.")
             val ytdlp = YoutubeDL.getInstance()
             val ytdlpCache = File(cacheDir, "ytdlp-cache").apply { mkdirs() }
-            val info = ytdlp.getInfo(YoutubeDLRequest(item.url).addOption("--cache-dir", ytdlpCache.absolutePath)).also { MediaInfoCache.put(this, item.url, it) }
+            val infoRequest = YoutubeDLRequest(item.url).addOption("--cache-dir", ytdlpCache.absolutePath)
+            InstagramCookies.applyIfInstagram(item.url, this, infoRequest)
+            val info = ytdlp.getInfo(infoRequest).also { MediaInfoCache.put(this, item.url, it) }
             val title = info.title ?: "LinkGrab download"
             DownloadStore.title(item.id, title)
             val cache = File(cacheDir, "downloads").apply { mkdirs() }
@@ -93,6 +96,7 @@ class DownloadService : Service() {
                 .addOption("-f", item.maxSizeBytes?.let { dev.personal.linkgrab.data.MediaInfoSizer.formatUnder(info, item.type == DownloadType.AUDIO, it) } ?: defaultFormat)
                 .addOption("--merge-output-format", "mp4")
                 .addOption("-o", File(cache, "%(title)s.%(ext)s").absolutePath)
+                .also { InstagramCookies.applyIfInstagram(item.url, this, it) }
             android.util.Log.i("LinkGrab", "download url=${item.url} type=${item.type} instagram=$instagram format=$defaultFormat")
             if (BuildConfig.DEBUG) request.addOption("--verbose")
             if (item.type == DownloadType.AUDIO) {

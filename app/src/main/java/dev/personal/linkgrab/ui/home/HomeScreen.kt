@@ -18,6 +18,7 @@ import dev.personal.linkgrab.ensureYoutubeDL
 import dev.personal.linkgrab.data.UrlParser
 import dev.personal.linkgrab.data.MediaInfoCache
 import dev.personal.linkgrab.data.MediaInfoSizer
+import dev.personal.linkgrab.data.InstagramCookies
 import dev.personal.linkgrab.model.DownloadStatus
 import dev.personal.linkgrab.model.DownloadType
 import dev.personal.linkgrab.service.DownloadService
@@ -69,7 +70,7 @@ fun HomeScreen(initialUrl: String? = null) {
             loading = true
             error = null
             scope.launch(Dispatchers.IO) {
-                try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val info = MediaInfoCache.get(context, url) ?: YoutubeDL.getInstance().getInfo(YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath)).also { MediaInfoCache.put(context, url, it) }; PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { input = url; preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
+                try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val infoRequest = YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath); InstagramCookies.applyIfInstagram(url, context, infoRequest); val info = MediaInfoCache.get(context, url) ?: YoutubeDL.getInstance().getInfo(infoRequest).also { MediaInfoCache.put(context, url, it) }; PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { input = url; preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
                 catch (failure: Throwable) { android.util.Log.w("LinkGrab", "getInfo failed for $url", failure); withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
             }
         }
@@ -81,7 +82,7 @@ fun HomeScreen(initialUrl: String? = null) {
             if (url == null) { error = "Paste a public web link. Links must start with http:// or https://."; return@UrlInputBar }
             input = url; loading = true; error = null
             scope.launch(Dispatchers.IO) {
-                try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val info = YoutubeDL.getInstance().getInfo(YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath)); MediaInfoCache.put(context, url, info); PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
+                try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val infoRequest = YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath); InstagramCookies.applyIfInstagram(url, context, infoRequest); val info = YoutubeDL.getInstance().getInfo(infoRequest); MediaInfoCache.put(context, url, info); PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
                 catch (failure: Throwable) { android.util.Log.w("LinkGrab", "getInfo failed for $url", failure); withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
             }
         })
