@@ -2,6 +2,18 @@
 
 ## Baseline
 
+## Fetch-speed upgrade baseline (2026-09-22, releaseTest on 192.168.0.106:5555)
+
+The existing app was measured before implementing the five requested changes. Preview was counted only when the UI exposed metadata fields (`Estimated size`/uploader/duration); a timeout means no usable preview was observed within 120 seconds.
+
+| Site | Cold | Warm | Observation |
+|---|---:|---:|---|
+| YouTube `9MndPs-o-xM` | timed out at 120 s | timed out at 120 s | UI remained in checking state |
+| TikTok `6718335390845095173` | 19 s | 5 s | usable preview appeared |
+| Instagram `DLHx_WNoXoY` | timed out at 120 s | timed out at 120 s | no usable preview |
+
+These are the **Before** values for Changes 1–5. No optimization was applied before this matrix.
+
 Phone Wi-Fi throughput: **PENDING direct measurement**. The connected Android shell exposes neither `curl` nor `wget`; the user reports an 8 Mbps line (about 1 MB/s real throughput), which is recorded as context only and is not treated as a measured baseline.
 
 Diagnostic device: Xiaomi `10.131.244.249:5555` (state `device`). The mandated `192.168.0.106:5555` was unavailable; testing used the newly authorized serial.

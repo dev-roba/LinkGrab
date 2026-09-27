@@ -142,3 +142,41 @@ uploader with Video (up to 1080p) and Audio (M4A) choices visible.
 
 ---
 *End of report*
+
+---
+
+## On-device re-verification (2026-09-27) — Instagram login wall confirmed
+
+**Device:** Xiaomi 25028RN03A (`serenity_global`), Android 15, arm64-v8a — releaseTest APK
+**Network:** Wi-Fi first, then LTE (Safaricom) to bypass the LAN egress filter
+
+Testing the `ba+bv` Instagram format change (`FormatSelector.instagramVideoFormat()` in
+`DownloadService`) on real reels produced the definitive root cause for the historical
+"Instagram fails (csrf / DNS)" finding:
+
+- On LTE, `www.instagram.com` DNS resolved and the resolved IP (`57.144.138.34:443`) passed
+  a TCP connect — the network path was healthy. (On the filtered Wi-Fi, Instagram was
+  unreachable and extraction failed fast with a DNS-style error.)
+- yt-dlp 2025.11.12 then failed on **two different real reels** (the user's original URL and
+  a second public one), both with:
+  ```
+  WARNING: [Instagram] <id>: Minimum webpage is locked behind the login page. Retrying with embed webpage
+  ERROR: [Instagram] <id>: Requested content is not available, rate-limit reached or login required.
+          Use --cookies-from-browser or --cookies for the authentication.
+  ```
+- The app surfaced this as "Instagram is asking for a login or has temporarily limited
+  access to this Reel." (ErrorMapper).
+- Conclusion: Instagram now rate-limits/blocks **anonymous** reel extraction. This is
+  **not** an app defect or a network defect — it is Instagram-side auth. Confirms the spike's
+  "Instagram fails (csrf — environment issues)" with the precise mechanism.
+
+### Follow-ups for future work
+- Unblocking Instagram downloads requires supplying account cookies to yt-dlp
+  (`--cookies` / `--cookies-from-browser`) — not implemented in LinkGrab as of this change.
+- A newer yt-dlp build (post-2025.11.12) may rework the Instagram extractor, but the login
+  wall is expected to persist for anonymous access.
+- Also re-observed: YouTube extraction can hang at "Checking the link…" for minutes on
+  carrier LTE (Safaricom throttles some Google CDN IPs) — consistent with the spike's
+  host-side 443 egress filtering of Google IP ranges.
+- Diagnostic logging added on-device: `Log.i("LinkGrab", "download url=… format=…")` in
+  `DownloadService`, `Log.w("LinkGrab", "getInfo failed…")` in `HomeScreen`.

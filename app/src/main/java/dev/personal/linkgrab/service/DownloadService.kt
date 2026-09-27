@@ -78,6 +78,10 @@ class DownloadService : Service() {
             DownloadStore.title(item.id, title)
             val cache = File(cacheDir, "downloads").apply { mkdirs() }
             DownloadStore.tempPath(item.id, File(cache, "${item.id}.part").absolutePath)
+            val instagram = FormatSelector.isInstagramUrl(item.url)
+            val defaultFormat = if (item.type == DownloadType.VIDEO) {
+                if (instagram) FormatSelector.instagramVideoFormat() else FormatSelector.videoFormat(quality)
+            } else "ba[ext=m4a]/ba"
             val request = YoutubeDLRequest(item.url)
                 .addOption("--socket-timeout", "15")
                 .addOption("--retries", "3")
@@ -86,11 +90,14 @@ class DownloadService : Service() {
                 .addOption("-N", "4")
                 .addOption("--continue")
                 .addOption("--extractor-args", "youtube:player_client=android")
-                .addOption("-f", item.maxSizeBytes?.let { dev.personal.linkgrab.data.MediaInfoSizer.formatUnder(info, item.type == DownloadType.AUDIO, it) } ?: if (item.type == DownloadType.VIDEO) FormatSelector.videoFormat(quality) else "ba[ext=m4a]/ba")
+                .addOption("-f", item.maxSizeBytes?.let { dev.personal.linkgrab.data.MediaInfoSizer.formatUnder(info, item.type == DownloadType.AUDIO, it) } ?: defaultFormat)
                 .addOption("--merge-output-format", "mp4")
                 .addOption("-o", File(cache, "%(title)s.%(ext)s").absolutePath)
+            android.util.Log.i("LinkGrab", "download url=${item.url} type=${item.type} instagram=$instagram format=$defaultFormat")
             if (BuildConfig.DEBUG) request.addOption("--verbose")
             if (item.type == DownloadType.AUDIO) {
+                request.addOption("--embed-metadata")
+                request.addOption("--embed-thumbnail")
                 FormatSelector.audioPostProcessorArgs(audio).forEachIndexed { index, option ->
                     if (option.startsWith("--") && index + 1 < FormatSelector.audioPostProcessorArgs(audio).size) request.addOption(option, FormatSelector.audioPostProcessorArgs(audio)[index + 1])
                     else if (option == "-x") request.addOption(option)
@@ -117,6 +124,7 @@ class DownloadService : Service() {
             DownloadStore.update(item.id, DownloadStatus.COMPLETED, outputPath = saved.first, sizeBytes = sizeBytes)
             notify("Saved $title (${formatBytes(sizeBytes)})", false)
         } catch (error: Throwable) {
+            android.util.Log.e("LinkGrab", "download error for url=${item.url}", error)
             PerfTrace.ytdlp("download_error type=${error.javaClass.name} message=${error.message.orEmpty()}")
             val host = runCatching { Uri.parse(item.url).host.orEmpty() }.getOrDefault("")
             if (host.contains("instagram") || host.contains("tiktok")) scope.launch { YtDlpUpdater.update(applicationContext) }

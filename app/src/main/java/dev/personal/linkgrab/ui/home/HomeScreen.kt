@@ -70,7 +70,7 @@ fun HomeScreen(initialUrl: String? = null) {
             error = null
             scope.launch(Dispatchers.IO) {
                 try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val info = MediaInfoCache.get(context, url) ?: YoutubeDL.getInstance().getInfo(YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath)).also { MediaInfoCache.put(context, url, it) }; PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { input = url; preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
-                catch (failure: Throwable) { withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
+                catch (failure: Throwable) { android.util.Log.w("LinkGrab", "getInfo failed for $url", failure); withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
             }
         }
     }
@@ -82,7 +82,7 @@ fun HomeScreen(initialUrl: String? = null) {
             input = url; loading = true; error = null
             scope.launch(Dispatchers.IO) {
                 try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val info = YoutubeDL.getInstance().getInfo(YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath)); MediaInfoCache.put(context, url, info); PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
-                catch (failure: Throwable) { withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
+                catch (failure: Throwable) { android.util.Log.w("LinkGrab", "getInfo failed for $url", failure); withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
             }
         })
             val allUrls = UrlParser.extractUrls(input)
