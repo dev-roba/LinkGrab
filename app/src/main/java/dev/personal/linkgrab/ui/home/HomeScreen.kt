@@ -19,13 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yausername.youtubedl_android.YoutubeDL
 import dev.personal.linkgrab.LinkGrabApp
-import dev.personal.linkgrab.ensureYoutubeDL
 import dev.personal.linkgrab.data.UrlParser
-import dev.personal.linkgrab.data.MediaInfoCache
+import dev.personal.linkgrab.data.MediaInfoFetcher
 import dev.personal.linkgrab.data.MediaInfoSizer
-import dev.personal.linkgrab.data.InstagramCookies
 import dev.personal.linkgrab.model.DownloadStatus
 import dev.personal.linkgrab.model.DownloadType
 import dev.personal.linkgrab.service.DownloadService
@@ -39,13 +36,10 @@ import dev.personal.linkgrab.ui.theme.StickerChip
 import dev.personal.linkgrab.ui.theme.StickerPill
 import dev.personal.linkgrab.ui.theme.sticker
 import dev.personal.linkgrab.util.ErrorMapper
-import dev.personal.linkgrab.util.PerfTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
-import java.io.File
-import com.yausername.youtubedl_android.YoutubeDLRequest
 
 private fun formatBytes(bytes: Long): String = when {
     bytes >= 1_000_000_000 -> "%.2f GB".format(bytes / 1_000_000_000.0)
@@ -83,8 +77,17 @@ fun HomeScreen(initialUrl: String? = null) {
             loading = true
             error = null
             scope.launch(Dispatchers.IO) {
-                try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val infoRequest = YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath); InstagramCookies.applyIfInstagram(url, context, infoRequest); val info = MediaInfoCache.get(context, url) ?: YoutubeDL.getInstance().getInfo(infoRequest).also { MediaInfoCache.put(context, url, it) }; PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { input = url; preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
-                catch (failure: Throwable) { android.util.Log.w("LinkGrab", "getInfo failed for $url", failure); withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
+                try {
+                    val info = MediaInfoFetcher.fetch(context, url)
+                    withContext(Dispatchers.Main) {
+                        input = url
+                        preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true))
+                        loading = false
+                    }
+                } catch (failure: Throwable) {
+                    android.util.Log.w("LinkGrab", "getInfo failed for $url", failure)
+                    withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false }
+                }
             }
         }
     }
@@ -116,8 +119,16 @@ fun HomeScreen(initialUrl: String? = null) {
                     if (url == null) { error = "Paste a public web link. Links must start with http:// or https://."; return@UrlInputBar }
                     input = url; loading = true; error = null
                     scope.launch(Dispatchers.IO) {
-                        try { PerfTrace.mark("fetchInfo_start"); ensureYoutubeDL(context); val infoRequest = YoutubeDLRequest(url).addOption("--cache-dir", File(context.cacheDir, "ytdlp-cache").absolutePath); InstagramCookies.applyIfInstagram(url, context, infoRequest); val info = YoutubeDL.getInstance().getInfo(infoRequest); MediaInfoCache.put(context, url, info); PerfTrace.mark("fetchInfo_end"); withContext(Dispatchers.Main) { preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true)); loading = false } }
-                        catch (failure: Throwable) { android.util.Log.w("LinkGrab", "getInfo failed for $url", failure); withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false } }
+                        try {
+                            val info = MediaInfoFetcher.fetch(context, url)
+                            withContext(Dispatchers.Main) {
+                                preview = Preview(info.title ?: "Untitled", info.thumbnail, info.duration, info.uploader, MediaInfoSizer.estimate(info, false), MediaInfoSizer.estimate(info, true))
+                                loading = false
+                            }
+                        } catch (failure: Throwable) {
+                            android.util.Log.w("LinkGrab", "getInfo failed for $url", failure)
+                            withContext(Dispatchers.Main) { error = ErrorMapper.map(failure, context).message; loading = false }
+                        }
                     }
                 })
                 val allUrls = UrlParser.extractUrls(input)
