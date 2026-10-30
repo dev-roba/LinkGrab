@@ -84,7 +84,9 @@ class DownloadService : Service() {
             val instagram = FormatSelector.isInstagramUrl(item.url)
             val defaultFormat = if (item.type == DownloadType.VIDEO) {
                 if (instagram) FormatSelector.instagramVideoFormat() else FormatSelector.videoFormat(quality)
-            } else "ba[ext=m4a]/ba"
+            } else {
+                FormatSelector.audioFormat(audio)
+            }
             val request = YoutubeDLRequest(item.url)
                 .addOption("--socket-timeout", "15")
                 .addOption("--retries", "3")
@@ -92,7 +94,7 @@ class DownloadService : Service() {
                 .addOption("--throttled-rate", "100K")
                 .addOption("-N", "4")
                 .addOption("--continue")
-                .addOption("--extractor-args", "youtube:player_client=android")
+                // Let yt-dlp choose the player client (avoids SABR-only android streams)
                 .addOption("-f", item.maxSizeBytes?.let { dev.personal.linkgrab.data.MediaInfoSizer.formatUnder(info, item.type == DownloadType.AUDIO, it) } ?: defaultFormat)
                 .addOption("--merge-output-format", "mp4")
                 .addOption("-o", File(cache, "%(title)s.%(ext)s").absolutePath)
@@ -240,5 +242,5 @@ object DownloadStore {
     fun tempPath(id: Long, value: String) { mutableItems.value = mutableItems.value.map { if (it.id == id) it.copy(tempPath = value) else it }; persist() }
     fun init(context: Context) { prefs = context.getSharedPreferences("download_queue", Context.MODE_PRIVATE); val json = org.json.JSONArray(prefs?.getString("items", "[]") ?: "[]"); val restored = (0 until json.length()).mapNotNull { runCatching { val o=json.getJSONObject(it); DownloadItem(o.getLong("id"),o.getString("url"),o.optString("title").ifBlank{null},DownloadType.valueOf(o.getString("type")),DownloadStatus.valueOf(o.getString("status")),o.optDouble("progress",0.0).toFloat(),o.optString("error").ifBlank{null},o.optString("output").ifBlank{null},o.optLong("size"),o.optLong("downloaded"),if(o.has("total"))o.optLong("total") else null,o.optDouble("speed"),if(o.has("eta"))o.optLong("eta") else null,o.optString("etaState","CALCULATING"),o.optLong("created"),AudioFormat.valueOf(o.optString("audio","MP3")),o.optInt("quality",720),if(o.has("maxSize"))o.optLong("maxSize") else null,o.optString("tempPath").ifBlank{null},if(o.has("retryAt"))o.optLong("retryAt") else null,o.optInt("retryAttempt",0)) }.getOrNull() }; mutableItems.value=restored; nextId=restored.maxOfOrNull{it.id}?:0L }
     private var prefs: android.content.SharedPreferences? = null
-    private fun persist() { val json = org.json.JSONArray(); mutableItems.value.forEach { o -> json.put(org.json.JSONObject().apply { put("id",o.id);put("url",o.url);put("title",o.title);put("type",o.type.name);put("status",o.status.name);put("progress",o.progress);put("error",o.errorMessage);put("output",o.outputPath);put("size",o.sizeBytes);put("downloaded",o.downloadedBytes);put("total",o.totalBytes);put("speed",o.speedBytesPerSecond);put("eta",o.etaSeconds);put("etaState",o.etaState);put("created",o.createdAt);put("audio",o.audioFormat.name);put("quality",o.quality);put("maxSize",o.maxSizeBytes);put("tempPath",o.tempPath);put("retryAt",o.retryAt);put("retryAttempt",o.retryAttempt) }) }; prefs?.edit()?.putString("items", json.toString())?.apply() }
+    private fun persist() { val json = org.json.JSONArray(); mutableItems.value.forEach { o -> json.put(org.json.JSONObject().apply { put("id",o.id);put("url",o.url);put("title",o.title);put("type",o.type.name);put("status",o.status.name);put("progress",o.progress);put("error",o.errorMessage);put("output",o.outputPath);put("size",o.sizeBytes);put("downloaded",o.downloadedBytes);if(o.totalBytes!=null)put("total",o.totalBytes);put("speed",o.speedBytesPerSecond);if(o.etaSeconds!=null)put("eta",o.etaSeconds);put("etaState",o.etaState);put("created",o.createdAt);put("audio",o.audioFormat.name);put("quality",o.quality);if(o.maxSizeBytes!=null)put("maxSize",o.maxSizeBytes);put("tempPath",o.tempPath);if(o.retryAt!=null)put("retryAt",o.retryAt);put("retryAttempt",o.retryAttempt) }) }; prefs?.edit()?.putString("items", json.toString())?.apply() }
 }

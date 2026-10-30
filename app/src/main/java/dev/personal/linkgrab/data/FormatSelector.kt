@@ -38,10 +38,10 @@ object FormatSelector {
 
     /**
      * Returns the yt-dlp format selector string for audio downloads.
-     * Selects best audio, then transcodes to the specified format via ffmpeg.
+     * Prefer pure audio, then any best stream so ffmpeg can extract/transcode.
      */
     fun audioFormat(audioFormat: AudioFormat): String {
-        return "ba[ext=m4a]/ba"
+        return "ba/bestaudio/b"
     }
 
     /**
