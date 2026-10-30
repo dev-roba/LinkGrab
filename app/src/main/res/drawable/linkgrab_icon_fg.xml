@@ -4,33 +4,21 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!--
-      Adaptive safe zone is the center ~72dp (18–90 on this viewport).
-      Artwork is scaled to fill that zone so the launcher icon is not tiny.
-    -->
-    <!-- Pink offset shadow under tile -->
+    <path android:fillColor="#FF6B9D" android:pathData="M44,34H68a10,10 0 0 1 10,10V68a10,10 0 0 1 -10,10H44a10,10 0 0 1 -10,-10V44a10,10 0 0 1 10,-10z" />
     <path
-        android:fillColor="@color/linkgrab_icon_pink"
-        android:pathData="M22,20 h64 a18,18 0 0 1 18,18 v52 a18,18 0 0 1 -18,18 h-64 a18,18 0 0 1 -18,-18 v-52 a18,18 0 0 1 18,-18 z" />
-    <!-- White rounded tile (shifted slightly up-left vs pink) -->
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#000000"
+        android:strokeWidth="3"
+        android:pathData="M40,30H64a10,10 0 0 1 10,10V64a10,10 0 0 1 -10,10H40a10,10 0 0 1 -10,-10V40a10,10 0 0 1 10,-10z" />
     <path
-        android:fillColor="@color/linkgrab_icon_tile"
-        android:pathData="M16,14 h64 a18,18 0 0 1 18,18 v52 a18,18 0 0 1 -18,18 h-64 a18,18 0 0 1 -18,-18 v-52 a18,18 0 0 1 18,-18 z" />
-    <!-- Black rounded border (outer path minus inner hole) -->
+        android:fillColor="#000000"
+        android:strokeColor="#000000"
+        android:strokeWidth="2"
+        android:strokeLineJoin="round"
+        android:pathData="M48,38H56V51H63L52,63L41,51H48Z" />
     <path
-        android:fillColor="@color/linkgrab_icon_ink"
-        android:pathData="M16,14 h64 a18,18 0 0 1 18,18 v52 a18,18 0 0 1 -18,18 h-64 a18,18 0 0 1 -18,-18 v-52 a18,18 0 0 1 18,-18 z M22,20 a12,12 0 0 0 -12,12 v52 a12,12 0 0 0 12,12 h64 a12,12 0 0 0 12,-12 v-52 a12,12 0 0 0 -12,-12 z"
-        android:fillType="evenOdd" />
-    <!-- Download arrow shaft -->
-    <path
-        android:fillColor="@color/linkgrab_icon_ink"
-        android:pathData="M46,30 h16 v28 h-16 z" />
-    <!-- Arrow head -->
-    <path
-        android:fillColor="@color/linkgrab_icon_ink"
-        android:pathData="M32,54 L54,82 L76,54 z" />
-    <!-- Base bar -->
-    <path
-        android:fillColor="@color/linkgrab_icon_ink"
-        android:pathData="M34,86 h40 a4,4 0 0 1 0,8 h-40 a4,4 0 0 1 0,-8 z" />
+        android:strokeColor="#000000"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M41,68H63" />
 </vector>
