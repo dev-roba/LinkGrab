@@ -9,8 +9,8 @@
     <application
         android:name=".LinkGrabApp"
         android:allowBackup="false"
-        android:icon="@drawable/linkgrab_icon"
-        android:roundIcon="@drawable/linkgrab_icon"
+        android:icon="@mipmap/linkgrab_launcher"
+        android:roundIcon="@mipmap/linkgrab_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.LinkGrab"

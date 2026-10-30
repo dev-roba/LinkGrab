@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="linkgrab_icon_bg">#FFEB3B</color>
+    <color name="linkgrab_icon_tile">#FFFFFF</color>
+    <color name="linkgrab_icon_ink">#0A0A0A</color>
+    <color name="linkgrab_icon_pink">#FF4DA6</color>
+</resources>

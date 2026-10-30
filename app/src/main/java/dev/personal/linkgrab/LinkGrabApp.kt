@@ -5,7 +5,6 @@ import dev.personal.linkgrab.data.history.HistoryRepository
 import dev.personal.linkgrab.data.YtDlpUpdater
 import dev.personal.linkgrab.data.settings.SettingsRepository
 import dev.personal.linkgrab.service.DownloadStore
-import dev.personal.linkgrab.service.DownloadService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,8 +18,8 @@ class LinkGrabApp : Application() {
         super.onCreate()
         historyRepository = HistoryRepository(this)
         settingsRepository = SettingsRepository(this)
-        DownloadStore.init(this)
-        DownloadService.resumeQueued(this)
+        // Fresh dashboard every launch: empty queue, no auto-resume of old jobs
+        DownloadStore.init(this, clearPersisted = true)
         CoroutineScope(Dispatchers.IO).launch {
             ensureYoutubeDL(this@LinkGrabApp)
             val preferences = getSharedPreferences("linkgrab_updates", MODE_PRIVATE)
