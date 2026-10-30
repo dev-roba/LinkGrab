@@ -1,25 +1,25 @@
 package dev.personal.linkgrab.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import dev.personal.linkgrab.ui.theme.Sticker
+import dev.personal.linkgrab.ui.theme.StickerButton
 
 sealed class Screen(val route: String, val label: String) {
     data object Home : Screen("home", "Home")
@@ -30,6 +30,13 @@ sealed class Screen(val route: String, val label: String) {
 
 private val bottomBarScreens = listOf(Screen.Home, Screen.Downloads, Screen.History, Screen.Settings)
 
+private fun navLabel(screen: Screen): String = when (screen) {
+    Screen.Home -> "HOME"
+    Screen.Downloads -> "QUEUE"
+    Screen.History -> "LIBRARY"
+    Screen.Settings -> "SETTINGS"
+}
+
 @Composable
 fun LinkGrabNavGraph(initialUrl: String? = null) {
     val navController = rememberNavController()
@@ -38,22 +45,18 @@ fun LinkGrabNavGraph(initialUrl: String? = null) {
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Sticker.Yellow)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 bottomBarScreens.forEach { screen ->
-                    NavigationBarItem(
-                        icon = {
-                            Icon(
-                                imageVector = when (screen) {
-                                    Screen.Home -> Icons.Default.Home
-                                    Screen.History -> Icons.Default.History
-                                    Screen.Settings -> Icons.Default.Settings
-                                    Screen.Downloads -> Icons.Default.Download
-                                },
-                                contentDescription = screen.label
-                            )
-                        },
-                        label = { Text(screen.label) },
-                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                    val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                    StickerButton(
+                        text = navLabel(screen),
                         onClick = {
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -62,7 +65,16 @@ fun LinkGrabNavGraph(initialUrl: String? = null) {
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+                        modifier = Modifier.weight(1f),
+                        container = if (isSelected) Sticker.White else Sticker.Yellow,
+                        content = Sticker.Ink,
+                        height = 48.dp,
+                        radius = 14.dp,
+                        shadowOffset = 0.dp,
+                        fontSize = 12.sp,
+                        horizontalPadding = 2.dp,
+                        selected = isSelected
                     )
                 }
             }
