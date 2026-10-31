@@ -1,3 +1,6 @@
 <resources>
-    <style name="Theme.LinkGrab" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Pre-Android 12: window background shows the yellow splash with the icon until the first frame. -->
+    <style name="Theme.LinkGrab" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@drawable/linkgrab_splash_bg</item>
+    </style>
 </resources>

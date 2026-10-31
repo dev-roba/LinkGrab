@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="@color/linkgrab_window_bg" />
+    </item>
+    <item
+        android:width="180dp"
+        android:height="180dp"
+        android:drawable="@drawable/linkgrab_icon_fg"
+        android:gravity="center" />
+</layer-list>

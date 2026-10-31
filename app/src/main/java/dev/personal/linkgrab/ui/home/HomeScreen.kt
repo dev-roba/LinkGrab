@@ -34,6 +34,7 @@ import dev.personal.linkgrab.ui.theme.Sticker
 import dev.personal.linkgrab.ui.theme.StickerButton
 import dev.personal.linkgrab.ui.theme.StickerChip
 import dev.personal.linkgrab.ui.theme.StickerPill
+import dev.personal.linkgrab.ui.theme.PopPill
 import dev.personal.linkgrab.ui.theme.sticker
 import dev.personal.linkgrab.util.ErrorMapper
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +70,14 @@ fun HomeScreen(initialUrl: String? = null) {
         value = withContext(Dispatchers.IO) { androidx.work.WorkManager.getInstance(context).getWorkInfosByTag("linkgrab-scheduled").get().filter { !it.state.isFinished }.size }
     }
     val activeCount = jobs.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED }
+    var pillFlash by remember { mutableStateOf<String?>(null) }
+    val completedCount = jobs.count { it.status == DownloadStatus.COMPLETED }
+    var lastCompleted by remember { mutableStateOf(completedCount) }
+    LaunchedEffect(completedCount) {
+        if (completedCount > lastCompleted) pillFlash = "SAVED!"
+        lastCompleted = completedCount
+    }
+    LaunchedEffect(pillFlash) { if (pillFlash != null) { delay(1800); pillFlash = null } }
     LaunchedEffect(Unit) { if (input.isBlank()) clipboard.getText()?.text?.let { UrlParser.extractUrls(it).firstOrNull()?.let { input = it } } }
     LaunchedEffect(input) {
         val url = UrlParser.extractUrls(input).firstOrNull() ?: UrlParser.normalizeUrl(input)
@@ -100,7 +109,7 @@ fun HomeScreen(initialUrl: String? = null) {
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("LINKGRAB", fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
-                StickerPill(if (activeCount > 0) "$activeCount downloading" else "Ready")
+                PopPill(pillFlash ?: if (activeCount > 0) "$activeCount downloading" else "Ready", highlight = pillFlash != null)
             }
         }
         // Headline
@@ -158,7 +167,7 @@ fun HomeScreen(initialUrl: String? = null) {
             }
         }
         error?.let { message -> item {
-            Text(message, Modifier.fillMaxWidth().sticker(Sticker.Pink, 16.dp, 4.dp).padding(16.dp), color = Sticker.Ink, fontWeight = FontWeight.Bold)
+            Text(message, Modifier.fillMaxWidth().sticker(Sticker.Pink, 16.dp, 4.dp).padding(16.dp), color = Sticker.Black, fontWeight = FontWeight.Bold)
         } }
         preview?.let { data -> item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -177,12 +186,12 @@ fun HomeScreen(initialUrl: String? = null) {
                 Text("SIZE LIMIT (OPTIONAL)", style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(end = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     listOf<Int?>(null, 30, 50, 100).forEach { limit ->
-                        StickerChip(label = limit?.let { "$it MB" } ?: "No limit", selected = sizeLimitMb == limit, onClick = { sizeLimitMb = limit }, selectedColor = Sticker.Pink, selectedContent = Sticker.Ink, height = 44.dp, fontSize = 14.sp)
+                        StickerChip(label = limit?.let { "$it MB" } ?: "No limit", selected = sizeLimitMb == limit, onClick = { sizeLimitMb = limit }, selectedColor = Sticker.Pink, selectedContent = Sticker.Black, height = 44.dp, fontSize = 14.sp)
                     }
                 }
                 StickerButton(
                     text = "DOWNLOAD NOW",
-                    onClick = { if (app.historyRepository.hasDownloaded(input, type.name)) duplicate = true else { DownloadService.enqueue(context, input, type, settings.audioFormat, settings.qualityCeiling, sizeLimitMb?.times(1_000_000L)); preview = null; input = "" } },
+                    onClick = { if (app.historyRepository.hasDownloaded(input, type.name)) duplicate = true else { DownloadService.enqueue(context, input, type, settings.audioFormat, settings.qualityCeiling, sizeLimitMb?.times(1_000_000L)); pillFlash = "GRABBED!"; preview = null; input = "" } },
                     modifier = Modifier.fillMaxWidth(),
                     container = Sticker.Ink,
                     content = Sticker.Yellow,
@@ -190,6 +199,7 @@ fun HomeScreen(initialUrl: String? = null) {
                     radius = 18.dp,
                     shadowOffset = 6.dp,
                     shadowColor = Sticker.Pink,
+                    haptic = true,
                     fontSize = 22.sp
                 )
                 StickerButton(

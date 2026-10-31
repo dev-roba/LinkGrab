@@ -1,0 +1,8 @@
+<resources>
+    <!-- Android 12+: system splash screen with the Bold Sticker icon on the brand background. -->
+    <style name="Theme.LinkGrab" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/linkgrab_window_bg</item>
+        <item name="android:windowSplashScreenBackground">@color/linkgrab_window_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/linkgrab_icon_fg</item>
+    </style>
+</resources>

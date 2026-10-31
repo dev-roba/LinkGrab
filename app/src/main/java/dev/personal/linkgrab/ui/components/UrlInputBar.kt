@@ -75,7 +75,7 @@ fun UrlInputBar(
         FlatButton(
             text = "GO",
             container = Sticker.Blue,
-            content = Sticker.White,
+            content = Sticker.OnBlue,
             enabled = value.isNotBlank(),
             onClick = onSubmit
         )
