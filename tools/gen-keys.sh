@@ -1,50 +1,55 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# -------------------------------------------------------
-# gen-keys.sh — Generate a release keystore for LinkGrab
-# -------------------------------------------------------
+# gen-keys.sh: generate the LinkGrab release keystore. Run it ONCE, from anywhere.
+# The keystore goes outside the repo; keystore.properties goes in the repo root (git-ignored).
 
-# Keystore path: outside the repo by default, overridable via $KEYSTORE_PATH or first arg
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KEYSTORE_PATH="${KEYSTORE_PATH:-${HOME}/.android/linkgrab-release.jks}"
 if [ -n "${1:-}" ]; then
   KEYSTORE_PATH="$1"
 fi
+PROPS="$REPO_ROOT/keystore.properties"
 
-# Ensure the parent directory exists
-KEYSTORE_DIR="$(dirname "$KEYSTORE_PATH")"
-mkdir -p "$KEYSTORE_DIR"
+if [ -e "$KEYSTORE_PATH" ] || [ -e "$PROPS" ]; then
+  echo "A keystore or keystore.properties already exists:"
+  [ -e "$KEYSTORE_PATH" ] && echo "  $KEYSTORE_PATH"
+  [ -e "$PROPS" ] && echo "  $PROPS"
+  echo "Refusing to overwrite. Overwriting would make existing installs impossible to update."
+  exit 1
+fi
 
-# Generate a strong random password; NEVER print it to stdout
-PASSWORD=$(openssl rand -base64 24)
+mkdir -p "$(dirname "$KEYSTORE_PATH")"
 
-# Generate the keystore with keytool
+# Random password (hex, so it is safe in shells and YAML). Never printed.
+PASSWORD="$(openssl rand -hex 24)"
+
 keytool -genkeypair \
   -keystore "$KEYSTORE_PATH" \
   -alias linkgrab \
   -storepass "$PASSWORD" \
   -keypass "$PASSWORD" \
-  -dn "CN=LinkGrab,OU=Personal,O=LinkGrab,L=Unknown,ST=Unknown,C=US" \
+  -dname "CN=LinkGrab,OU=Personal,O=LinkGrab,L=Unknown,ST=Unknown,C=US" \
   -validity 10000 \
   -keyalg RSA \
   -keysize 4096 \
   -storetype JKS
+chmod 600 "$KEYSTORE_PATH"
 
-# Write keystore.properties (git-ignored) — never echo the password
-cat > /home/roba/LinkGrab/keystore.properties <<EOF
+( umask 177
+  cat > "$PROPS" <<PROPS_EOF
 storeFile=$KEYSTORE_PATH
 storePassword=$PASSWORD
 keyAlias=linkgrab
 keyPassword=$PASSWORD
-EOF
+PROPS_EOF
+)
 
-# Secure the properties file
-chmod 600 /home/roba/LinkGrab/keystore.properties
-
-# Success message — DO NOT commit keystore.properties or the .jks
 echo "========================================="
-echo "Keystore generated at: $KEYSTORE_PATH"
-echo "WARNING: Back up the keystore file and this password securely."
-echo "Loss of either means you CANNOT update the app (new signature required)."
-echo "Never commit keystore.properties or the .jks file to version control."
+echo "Keystore:   $KEYSTORE_PATH"
+echo "Properties: $PROPS (git-ignored)"
+echo
+echo "BACK UP BOTH NOW (password manager or encrypted storage)."
+echo "If you lose them you can never update installed copies of the app."
+echo "Never commit either file."
 echo "========================================="
