@@ -30,6 +30,13 @@ import dev.personal.linkgrab.service.DownloadStore
 import dev.personal.linkgrab.service.DownloadLaterScheduler
 import dev.personal.linkgrab.ui.components.MetadataCard
 import dev.personal.linkgrab.ui.components.UrlInputBar
+import dev.personal.linkgrab.ui.components.ClipboardBanner
+import dev.personal.linkgrab.ui.components.FetchingArrow
+import dev.personal.linkgrab.ui.components.SavedSticker
+import dev.personal.linkgrab.ui.components.rememberNotificationPermissionRequester
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import dev.personal.linkgrab.ui.theme.Sticker
 import dev.personal.linkgrab.ui.theme.StickerButton
 import dev.personal.linkgrab.ui.theme.StickerChip
@@ -71,6 +78,26 @@ fun HomeScreen(initialUrl: String? = null) {
     }
     val activeCount = jobs.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED }
     var pillFlash by remember { mutableStateOf<String?>(null) }
+    var grabbing by remember { mutableStateOf(false) }
+    var clipLink by remember { mutableStateOf<String?>(null) }
+    var lastClip by remember { mutableStateOf<String?>(null) }
+    var clipTick by remember { mutableStateOf(0) }
+    val requestNotifications = rememberNotificationPermissionRequester()
+    val hostActivity = context as? androidx.activity.ComponentActivity
+    DisposableEffect(hostActivity) {
+        val observer = object : androidx.lifecycle.LifecycleEventObserver {
+            override fun onStateChanged(source: androidx.lifecycle.LifecycleOwner, event: androidx.lifecycle.Lifecycle.Event) {
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) clipTick++
+            }
+        }
+        hostActivity?.lifecycle?.addObserver(observer)
+        onDispose { hostActivity?.lifecycle?.removeObserver(observer) }
+    }
+    LaunchedEffect(clipTick) {
+        delay(350)
+        val link = clipboard.getText()?.text?.let { UrlParser.extractUrls(it).firstOrNull() }
+        if (link != null && link != lastClip && input.isBlank()) clipLink = link
+    }
     val completedCount = jobs.count { it.status == DownloadStatus.COMPLETED }
     var lastCompleted by remember { mutableStateOf(completedCount) }
     LaunchedEffect(completedCount) {
@@ -78,7 +105,7 @@ fun HomeScreen(initialUrl: String? = null) {
         lastCompleted = completedCount
     }
     LaunchedEffect(pillFlash) { if (pillFlash != null) { delay(1800); pillFlash = null } }
-    LaunchedEffect(Unit) { if (input.isBlank()) clipboard.getText()?.text?.let { UrlParser.extractUrls(it).firstOrNull()?.let { input = it } } }
+    // Clipboard links are offered by the "Link found. GRAB?" banner instead of being pasted automatically.
     LaunchedEffect(input) {
         val url = UrlParser.extractUrls(input).firstOrNull() ?: UrlParser.normalizeUrl(input)
         if (url != null && preview == null && !loading) {
@@ -118,6 +145,15 @@ fun HomeScreen(initialUrl: String? = null) {
                 Text("GRAB\nANY\nTHING.", fontSize = 56.sp, lineHeight = 54.sp, fontWeight = FontWeight.Bold, letterSpacing = (-2).sp)
                 Text("Share a link here, or paste one below.", fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 8.dp))
                 if (scheduled > 0) Text("$scheduled scheduled download${if (scheduled == 1) "" else "s"} waiting for Wi‑Fi and charging", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        clipLink?.let { link ->
+            if (input.isBlank()) item {
+                ClipboardBanner(
+                    link = link,
+                    onGrab = { input = link; lastClip = link; clipLink = null },
+                    onDismiss = { lastClip = link; clipLink = null }
+                )
             }
         }
         // Input + multi-link actions
@@ -162,15 +198,24 @@ fun HomeScreen(initialUrl: String? = null) {
         }
         if (loading) item {
             Column(Modifier.fillMaxWidth().sticker(Sticker.White, 16.dp, 4.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                LinearProgressIndicator(Modifier.fillMaxWidth(), color = Sticker.Ink, trackColor = Sticker.Track)
-                Text("Checking the link…", fontWeight = FontWeight.Bold)
+                FetchingArrow()
+                Text("Checking the link. One moment.", fontSize = 13.sp)
             }
         }
         error?.let { message -> item {
             Text(message, Modifier.fillMaxWidth().sticker(Sticker.Pink, 16.dp, 4.dp).padding(16.dp), color = Sticker.Black, fontWeight = FontWeight.Bold)
         } }
         preview?.let { data -> item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val grabProgress by animateFloatAsState(if (grabbing) 1f else 0f, tween(320), label = "grab")
+            Column(
+                modifier = Modifier.graphicsLayer {
+                    translationY = grabProgress * 260.dp.toPx()
+                    alpha = 1f - grabProgress
+                    scaleX = 1f - 0.08f * grabProgress
+                    scaleY = 1f - 0.08f * grabProgress
+                },
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 MetadataCard(
                     title = data.title,
                     thumbnailUrl = data.thumbnail,
@@ -191,7 +236,7 @@ fun HomeScreen(initialUrl: String? = null) {
                 }
                 StickerButton(
                     text = "DOWNLOAD NOW",
-                    onClick = { if (app.historyRepository.hasDownloaded(input, type.name)) duplicate = true else { DownloadService.enqueue(context, input, type, settings.audioFormat, settings.qualityCeiling, sizeLimitMb?.times(1_000_000L)); pillFlash = "GRABBED!"; preview = null; input = "" } },
+                    onClick = { if (app.historyRepository.hasDownloaded(input, type.name)) duplicate = true else { DownloadService.enqueue(context, input, type, settings.audioFormat, settings.qualityCeiling, sizeLimitMb?.times(1_000_000L)); pillFlash = "GRABBED!"; requestNotifications(); grabbing = true; scope.launch { delay(340); preview = null; input = ""; grabbing = false } } },
                     modifier = Modifier.fillMaxWidth(),
                     container = Sticker.Ink,
                     content = Sticker.Yellow,
@@ -200,7 +245,8 @@ fun HomeScreen(initialUrl: String? = null) {
                     shadowOffset = 6.dp,
                     shadowColor = Sticker.Pink,
                     haptic = true,
-                    fontSize = 22.sp
+                    fontSize = 22.sp,
+                    enabled = !grabbing
                 )
                 StickerButton(
                     text = "DOWNLOAD LATER · WI‑FI + CHARGING",
@@ -243,6 +289,7 @@ fun HomeScreen(initialUrl: String? = null) {
             }
         }
     }
+    SavedSticker(visible = pillFlash == "SAVED!")
     if (duplicate) AlertDialog(onDismissRequest = { duplicate = false }, title = { Text("Already downloaded") }, text = { Text("You already downloaded this item. Open the existing copy or download it again?") }, confirmButton = { TextButton({ duplicate = false }) { Text("Open existing") } }, dismissButton = { TextButton({ DownloadService.enqueue(context, input, type, settings.audioFormat, settings.qualityCeiling, sizeLimitMb?.times(1_000_000L)); duplicate = false; preview = null; input = "" }) { Text("Download again") } })
     if (showWelcome) AlertDialog(onDismissRequest = { showWelcome = false; context.getSharedPreferences("onboarding", 0).edit().putBoolean("seen", true).apply() }, title = { Text("Welcome to LinkGrab") }, text = { Text("Share links from your apps, paste a link, or use the clipboard tile. Downloads are saved in Movies/LinkGrab or Music/LinkGrab. Scheduled downloads wait for Wi‑Fi and charging.") }, confirmButton = { Button({ showWelcome = false; context.getSharedPreferences("onboarding", 0).edit().putBoolean("seen", true).apply() }) { Text("Got it") } })
 }

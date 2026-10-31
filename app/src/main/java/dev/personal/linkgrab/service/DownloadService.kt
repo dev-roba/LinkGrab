@@ -144,6 +144,12 @@ class DownloadService : Service() {
     }
     private fun notify(text: String, ongoing: Boolean) = (getSystemService(NotificationManager::class.java)).notify(NOTIFICATION_ID, notification(text, ongoing))
     private var lastNotificationMillis = 0L
+    private fun notifyRich(title: String, text: String, percent: Int, indeterminate: Boolean) =
+        (getSystemService(NotificationManager::class.java)).notify(NOTIFICATION_ID, notification(text, true, title, percent, indeterminate))
+    private fun rate(id: Long): String {
+        val job = DownloadStore.items.value.firstOrNull { it.id == id } ?: return ""
+        return "${dev.personal.linkgrab.util.EtaFormatter.speed(job.speedBytesPerSecond)} · ${dev.personal.linkgrab.util.EtaFormatter.duration(job.etaSeconds)} left"
+    }
     private fun notifyProgress(id: Long, snapshot: dev.personal.linkgrab.util.EtaSnapshot, progress: Float) {
         val now = System.currentTimeMillis()
         if (now - lastNotificationMillis < 1_000) return
@@ -153,16 +159,16 @@ class DownloadService : Service() {
             dev.personal.linkgrab.util.EtaState.CALCULATING -> "Preparing…"
             dev.personal.linkgrab.util.EtaState.STALLED -> "Stalled — retry"
             dev.personal.linkgrab.util.EtaState.DONE -> "Complete"
-            dev.personal.linkgrab.util.EtaState.ESTIMATING -> "${percent}% · ${dev.personal.linkgrab.util.EtaFormatter.status(snapshot)}"
+            dev.personal.linkgrab.util.EtaState.ESTIMATING -> "${percent}% · ${rate(id)}"
         }
-        notify(detail, true)
+        notifyRich(DownloadStore.items.value.firstOrNull { it.id == id }?.title ?: "Downloading", detail, percent, snapshot.state == dev.personal.linkgrab.util.EtaState.CALCULATING)
     }
-    private fun notification(text: String, ongoing: Boolean): android.app.Notification {
+    private fun notification(text: String, ongoing: Boolean, title: String = "LinkGrab", progress: Int? = null, indeterminate: Boolean = false): android.app.Notification {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "LinkGrab downloads", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val cancel = PendingIntent.getService(this, 91, Intent(this, DownloadService::class.java).setAction(ACTION_CANCEL).putExtra(EXTRA_ID, DownloadStore.items.value.firstOrNull { it.status == DownloadStatus.RUNNING }?.id ?: -1L), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return NotificationCompat.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("LinkGrab").setContentText(text).setContentIntent(open).setOngoing(ongoing).addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancel).build()
+        return NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_stat_linkgrab).setContentTitle(title).setContentText(text).setContentIntent(open).setOngoing(ongoing).setOnlyAlertOnce(true).setColor(0xFFFFD93B.toInt()).apply { if (progress != null) setProgress(100, progress, indeterminate) }.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancel).build()
     }
     companion object {
         private const val CHANNEL = "downloads"; private const val NOTIFICATION_ID = 7

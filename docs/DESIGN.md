@@ -34,3 +34,13 @@ Android 12+: system splash with `linkgrab_icon_fg` on `linkgrab_window_bg` (yell
 - Leave at least 4dp of padding around anything with a shadow or the shadow gets clipped (use `contentPadding`, not `padding`, on lazy lists).
 - Font is the system sans-serif Bold. To use Space Grotesk, add the .ttf files to `res/font` and edit `LinkGrabFont` in `Theme.kt`.
 - Accessibility: touch targets at least 44dp, AA contrast on both themes.
+
+## Grab moments (update 4)
+- **Grab:** DOWNLOAD NOW buzzes, the preview card slides down and fades into the queue (about 320ms), the header pill pops "GRABBED!".
+- **Saved:** when a download finishes, a big tilted pink "SAVED!" sticker pops in the middle of the screen (`SavedSticker`) and the header pill pops "SAVED!".
+- **Clipboard banner:** a blue `ClipboardBanner` ("LINK FOUND. GRAB?") replaces the old auto-paste. GRAB fills the link and fetches the preview; X dismisses it. It re-checks every time the app comes to the front.
+- **Loading:** `FetchingArrow` (an arrow bouncing onto a pink tray, "FETCHING…") replaces the plain progress bar while a link is checked.
+
+## Notifications
+- The download notification shows the video title, a real progress bar, and "percent · speed · time left", with a yellow accent and the arrow icon. It updates about once a second without sound.
+- The notification permission (Android 13+) is requested the first time you tap DOWNLOAD NOW if it is missing, and once after the welcome dialog.
