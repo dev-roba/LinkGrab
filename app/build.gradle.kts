@@ -113,5 +113,7 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.youtubedl.library)
     implementation(libs.youtubedl.ffmpeg)
+    implementation("androidx.media3:media3-exoplayer:1.10.0")
+    implementation("androidx.media3:media3-session:1.10.0")
     debugImplementation(libs.androidx.ui.tooling)
 }

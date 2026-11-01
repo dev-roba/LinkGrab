@@ -44,3 +44,13 @@ Android 12+: system splash with `linkgrab_icon_fg` on `linkgrab_window_bg` (yell
 ## Notifications
 - The download notification shows the video title, a real progress bar, and "percent · speed · time left", with a yellow accent and the arrow icon. It updates about once a second without sound.
 - The notification permission (Android 13+) is requested the first time you tap DOWNLOAD NOW if it is missing, and once after the welcome dialog.
+
+## Player (update 5)
+- **Where:** `ui/player/` (PlayerScreen, MiniPlayer, PlayerUi, PlayerParts), `playback/` (PlaybackService, PlayerConnection, PositionStore).
+- **How it works:** the real ExoPlayer lives in `PlaybackService` (a Media3 session), so audio keeps playing with the app closed and the notification and lock-screen controls come for free. The UI talks to it through a `MediaController` held by `PlayerConnection`.
+- **Library:** tap a card to play it (the whole filtered list becomes the queue), hold for PLAY / SHARE / OPEN IN ANOTHER APP / DOWNLOAD AGAIN / DELETE. A card shows live equalizer bars while it plays.
+- **Video:** immersive full screen, controls hide after 3 seconds. Double-tap left/right = -10s/+10s, swipe up/down on the right = volume, on the left = brightness. Buttons: minimize, picture-in-picture, rotate.
+- **Audio:** tilted artwork card that breathes while playing, equalizer bars, seek bar, previous/next, repeat (off / all / one), shuffle, speed (0.5x to 2x), sleep timer (15 / 30 / 60 min).
+- **Mini-player:** sticker bar above the bottom nav on every tab; tap to open, X to stop.
+- **Resume:** the position of every file is remembered (not for the first or last 5 seconds).
+- Press-feel icon buttons are `StickerIconButton`; the seek bar is `StickerSeekBar`.

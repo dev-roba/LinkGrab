@@ -8,7 +8,7 @@ import android.os.Environment
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -49,7 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,6 +60,10 @@ import androidx.compose.ui.unit.sp
 import dev.personal.linkgrab.LinkGrabApp
 import dev.personal.linkgrab.data.history.HistoryEntity
 import dev.personal.linkgrab.model.DownloadType
+import dev.personal.linkgrab.playback.PlayItem
+import dev.personal.linkgrab.playback.PlayerConnection
+import dev.personal.linkgrab.ui.player.EqBars
+import dev.personal.linkgrab.ui.player.rememberPlayerUi
 import dev.personal.linkgrab.service.DownloadService
 import dev.personal.linkgrab.ui.theme.Sticker
 import dev.personal.linkgrab.ui.theme.StickerButton
@@ -71,7 +78,7 @@ import kotlinx.coroutines.withContext
 import java.net.URL
 
 @Composable
-fun HistoryScreen() {
+fun HistoryScreen(onOpenPlayer: () -> Unit = {}) {
     val context = LocalContext.current
     val app = context.applicationContext as LinkGrabApp
     val repository = app.historyRepository
@@ -81,6 +88,13 @@ fun HistoryScreen() {
     var selected by remember { mutableStateOf<HistoryEntity?>(null) }
 
     val shown = items.filter { filter == "ALL" || it.downloadType == filter }
+    val playerUi = rememberPlayerUi(PlayerConnection.player)
+    val playingId = if (playerUi?.isPlaying == true) playerUi.mediaId else null
+    val playFrom: (HistoryEntity) -> Unit = { entry ->
+        val queue = shown.map { PlayItem(it.mediaUri, it.title, it.thumbnailUrl, it.downloadType == DownloadType.VIDEO.name) }
+        PlayerConnection.playQueue(context, queue, shown.indexOfFirst { it.id == entry.id }.coerceAtLeast(0))
+        onOpenPlayer()
+    }
     val usedBytes = items.sumOf { it.sizeBytes }
     val deviceTotal = remember {
         runCatching { Environment.getExternalStorageDirectory().totalSpace }.getOrDefault(0L)
@@ -115,6 +129,7 @@ fun HistoryScreen() {
                         )
                     }
                 }
+                Text("Tap to play. Hold for more.", fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
         }
 
@@ -139,7 +154,9 @@ fun HistoryScreen() {
             LibraryCard(
                 item = entry,
                 tilt = if (index % 2 == 0) -1.2f else 1.2f,
-                onClick = { selected = entry }
+                nowPlaying = playingId == entry.mediaUri,
+                onPlay = { playFrom(entry) },
+                onMore = { selected = entry }
             )
         }
     }
@@ -158,13 +175,7 @@ fun HistoryScreen() {
                     StickerButton(
                         text = "PLAY",
                         onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(item.mediaUri))
-                                        .setDataAndType(Uri.parse(item.mediaUri), item.mimeType)
-                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                )
-                            }
+                            playFrom(item)
                             selected = null
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -181,6 +192,24 @@ fun HistoryScreen() {
                                     Intent(Intent.ACTION_SEND)
                                         .setType(item.mimeType)
                                         .putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaUri))
+                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                )
+                            }
+                            selected = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        container = Sticker.White,
+                        content = Sticker.Ink,
+                        height = 48.dp,
+                        fontSize = 16.sp
+                    )
+                    StickerButton(
+                        text = "OPEN IN ANOTHER APP",
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(item.mediaUri))
+                                        .setDataAndType(Uri.parse(item.mediaUri), item.mimeType)
                                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 )
                             }
@@ -237,7 +266,13 @@ fun HistoryScreen() {
 }
 
 @Composable
-private fun LibraryCard(item: HistoryEntity, tilt: Float, onClick: () -> Unit) {
+private fun LibraryCard(
+    item: HistoryEntity,
+    tilt: Float,
+    nowPlaying: Boolean,
+    onPlay: () -> Unit,
+    onMore: () -> Unit
+) {
     val thumbShape = RoundedCornerShape(12.dp)
     Column(
         modifier = Modifier
@@ -245,7 +280,10 @@ private fun LibraryCard(item: HistoryEntity, tilt: Float, onClick: () -> Unit) {
             .rotate(tilt)
             .sticker(Sticker.White, 16.dp, 4.dp)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onPlay() }, onLongPress = { onMore() })
+            }
+            .semantics(mergeDescendants = true) { contentDescription = "Play ${item.title}" }
             .padding(10.dp)
     ) {
         Box {
@@ -266,6 +304,20 @@ private fun LibraryCard(item: HistoryEntity, tilt: Float, onClick: () -> Unit) {
                 background = Sticker.Pink,
                 textColor = Sticker.Black
             )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .size(36.dp)
+                    .sticker(Sticker.Blue, 18.dp, 2.dp, Sticker.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                if (nowPlaying) {
+                    EqBars(playing = true, color = Sticker.OnBlue, modifier = Modifier.size(18.dp))
+                } else {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Sticker.OnBlue, modifier = Modifier.size(22.dp))
+                }
+            }
         }
         Text(
             text = item.title,
