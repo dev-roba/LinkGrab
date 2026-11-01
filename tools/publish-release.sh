@@ -5,15 +5,21 @@
 #   tools/publish-release.sh                      publish to the repo this folder pushes to
 #   tools/publish-release.sh --make-public        also make a private repo public (after a secrets scan)
 #   tools/publish-release.sh --repo OWNER/NAME    publish the APK to a different, public repo
+#   tools/publish-release.sh --skip-build         reuse the APK from the last build
+#   tools/publish-release.sh --allow-dirty        publish even with uncommitted changes
 set -euo pipefail
 
 REPO=""
 MAKE_PUBLIC=0
+SKIP_BUILD=0
+ALLOW_DIRTY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --make-public) MAKE_PUBLIC=1 ;;
+    --skip-build) SKIP_BUILD=1 ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
     --repo) REPO="${2:-}"; shift ;;
-    -h|--help) sed -n '2,7p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1"; exit 2 ;;
   esac
   shift
@@ -21,10 +27,23 @@ done
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
+# Run a command up to 4 times: home Wi-Fi to GitHub drops now and then.
+retry() {
+  local n=0
+  until "$@"; do
+    n=$((n + 1))
+    [ "$n" -ge 4 ] && return 1
+    echo "Network problem, retrying in 15 seconds ($n of 3)..."
+    sleep 15
+  done
+}
+
 cd "$(git rev-parse --show-toplevel)"
 
 command -v gh >/dev/null || fail "GitHub CLI not installed. Install it with: sudo pacman -S github-cli"
 gh auth status >/dev/null 2>&1 || fail "Not logged in to GitHub. Run: gh auth login"
+
+curl -sI --max-time 15 https://github.com >/dev/null 2>&1 || fail "Cannot reach github.com right now. Check your internet (try: curl -I https://github.com) and run this again."
 
 ORIGIN_REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
 [ -n "$REPO" ] || REPO="$ORIGIN_REPO"
@@ -76,13 +95,24 @@ MSG
   echo "$REPO is now public."
 fi
 
+# The release tag points at a commit, so the APK must come from committed code.
+if [ "$ALLOW_DIRTY" -ne 1 ] && [ -n "$(git status --porcelain)" ]; then
+  echo "You have uncommitted changes:"
+  git status --short | head -15
+  fail "Commit them first (git add -A && git commit -m \"Release $TAG\"), or run again with --allow-dirty."
+fi
+
 # ---- 2. Build the signed APK --------------------------------------------------------------------
 if [ -d /usr/lib/jvm/java-17-openjdk ]; then
   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 fi
-echo "Building the signed APK (this takes a while)..."
-./gradlew :app:assembleReleaseTest
 APK="app/build/outputs/apk/releaseTest/app-releaseTest.apk"
+if [ "$SKIP_BUILD" -eq 1 ] && [ -f "$APK" ]; then
+  echo "Reusing the APK from the last build."
+else
+  echo "Building the signed APK (this takes a while)..."
+  ./gradlew :app:assembleReleaseTest
+fi
 [ -f "$APK" ] || fail "APK not found at $APK"
 
 APKSIGNER="$(ls -d "${ANDROID_HOME:-$HOME/Android/Sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)"
@@ -102,23 +132,22 @@ SHA="$(sha256sum "$ASSET" | cut -d' ' -f1)"
 echo "SHA-256: $SHA"
 
 # ---- 3. Publish ------------------------------------------------------------------------------------
-[ -z "$(git status --porcelain)" ] || echo "Note: you have uncommitted changes; they are not part of the release tag."
 read -r -p "Publish $TAG to $REPO now? [y/N] " go
 [ "$go" = "y" ] || fail "Cancelled. The APK is at $ASSET"
 
 TARGET_ARGS=()
 if [ "$REPO" = "$ORIGIN_REPO" ]; then
   BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-  git push origin "$BRANCH"
+  retry git push origin "$BRANCH" || fail "Could not push to GitHub after 4 tries. Check your internet, then run again with --skip-build."
   TARGET_ARGS=(--target "$BRANCH")
 fi
 
 NOTES="Signed APK for Android 8.0 or newer. SHA-256: $SHA"
 if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
   echo "Release $TAG already exists; replacing its APK."
-  gh release upload "$TAG" "$ASSET" --clobber -R "$REPO"
+  retry gh release upload "$TAG" "$ASSET" --clobber -R "$REPO" || fail "Upload failed after 4 tries. Run again with --skip-build."
 else
-  gh release create "$TAG" "$ASSET" -R "$REPO" --title "LinkGrab $VERSION" --notes "$NOTES" "${TARGET_ARGS[@]}"
+  retry gh release create "$TAG" "$ASSET" -R "$REPO" --title "LinkGrab $VERSION" --notes "$NOTES" "${TARGET_ARGS[@]}" || fail "Release creation failed after 4 tries. Run again with --skip-build."
 fi
 
 # ---- 4. Check what visitors will actually see -------------------------------------------------------
